@@ -1,0 +1,392 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PROGRAM=dspi-config
+readonly DSHANPI_APT_URI=https://dl.100ask.net/apt
+readonly DSHANPI_KEYRING=/usr/share/keyrings/dshanpi-archive-keyring.gpg
+
+armbian_env=${DSPI_ARMBIAN_ENV:-/boot/armbianEnv.txt}
+armbian_release=${DSPI_ARMBIAN_RELEASE:-/etc/armbian-release}
+profile_root=${DSPI_PROFILE_ROOT:-/usr/share/dspi-config/boards}
+overlay_dir=${DSPI_OVERLAY_DIR:-/boot/dtb/rockchip/overlay}
+dshanpi_source=${DSPI_DSHANPI_SOURCE:-/etc/apt/sources.list.d/dshanpi.sources}
+ubuntu_source=${DSPI_UBUNTU_SOURCE:-/etc/apt/sources.list.d/ubuntu.sources}
+mirrors_file=${DSPI_MIRRORS_FILE:-/usr/share/dspi-config/mirrors.tsv}
+
+usage() {
+	cat <<'EOF'
+Usage:
+  dspi-config
+  dspi-config status
+  dspi-config overlay list
+  dspi-config overlay enable <token>
+  dspi-config overlay disable <token>
+  dspi-config source show
+  dspi-config source channel stable|testing
+  dspi-config source mirror official|tuna|ustc
+  dspi-config update list
+  dspi-config update install <version>
+  dspi-config update rollback
+EOF
+}
+
+die() {
+	echo "$PROGRAM: $*" >&2
+	exit 1
+}
+
+require_root() {
+	[[ ${EUID:-$(id -u)} -eq 0 || ${DSPI_ALLOW_NON_ROOT:-no} == yes ]] ||
+		die "该操作必须使用 root 权限"
+}
+
+board_name() {
+	if [[ -n ${DSPI_BOARD:-} ]]; then
+		printf '%s\n' "$DSPI_BOARD"
+		return
+	fi
+	awk -F= '$1 == "BOARD" { gsub(/^"|"$/, "", $2); print $2; exit }' "$armbian_release" 2>/dev/null
+}
+
+profile_file() {
+	local board
+	board=$(board_name)
+	[[ -n "$board" ]] || die "无法从 $armbian_release 识别板卡"
+	printf '%s/%s/overlays.tsv\n' "$profile_root" "$board"
+}
+
+system_profile_file() {
+	local board
+	board=$(board_name)
+	[[ -n "$board" ]] || die "无法从 $armbian_release 识别板卡"
+	printf '%s/%s/system.conf\n' "$profile_root" "$board"
+}
+
+profile_value() {
+	local key=$1 profile value
+	profile=$(system_profile_file)
+	[[ -f "$profile" ]] || die "板卡系统配置不存在: $profile"
+	value=$(awk -F= -v key="$key" '
+		$0 !~ /^[[:space:]]*#/ && $1 == key {
+			print substr($0, index($0, "=") + 1)
+			found = 1
+			exit
+		}
+		END { exit(found ? 0 : 1) }
+	' "$profile") || die "板卡系统配置缺少 $key: $profile"
+	[[ "$value" =~ ^[a-z0-9][a-z0-9.+[:space:]-]*$ ]] || die "板卡系统配置中的 $key 非法"
+	printf '%s\n' "$value"
+}
+
+read_env_value() {
+	local key=$1
+	awk -F= -v key="$key" '$1 == key { value = substr($0, index($0, "=") + 1) } END { print value }' \
+		"$armbian_env" 2>/dev/null
+}
+
+active_overlays() {
+	local value
+	value=$(read_env_value overlays)
+	for token in $value; do
+		printf '%s\n' "$token"
+	done
+}
+
+overlay_record() {
+	local wanted=$1 profile
+	profile=$(profile_file)
+	[[ -f "$profile" ]] || die "板卡 overlay 清单不存在: $profile"
+	awk -F '|' -v wanted="$wanted" '$1 == wanted { print; found = 1; exit } END { exit(found ? 0 : 1) }' "$profile" ||
+		die "未知 overlay: $wanted"
+}
+
+is_overlay_active() {
+	local wanted=$1
+	active_overlays | grep -Fqx "$wanted"
+}
+
+write_env_key() {
+	local key=$1 value=$2 directory temporary mode owner group lock_file
+	[[ -f "$armbian_env" ]] || die "启动环境文件不存在: $armbian_env"
+	lock_file="${armbian_env}.dspi-config.lock"
+	exec {env_lock_fd}> "$lock_file"
+	flock -x "$env_lock_fd"
+	directory=$(dirname "$armbian_env")
+	temporary=$(mktemp "$directory/.armbianEnv.txt.dspi-config.XXXXXX")
+	mode=$(stat -c '%a' "$armbian_env")
+	owner=$(stat -c '%u' "$armbian_env")
+	group=$(stat -c '%g' "$armbian_env")
+	cp -a "$armbian_env" "$armbian_env.dspi-config.bak"
+	awk -F= -v key="$key" -v value="$value" '
+		$1 == key {
+			if (!written) print key "=" value
+			written = 1
+			next
+		}
+		{ print }
+		END { if (!written) print key "=" value }
+	' "$armbian_env" > "$temporary"
+	chmod "$mode" "$temporary"
+	chown "$owner:$group" "$temporary" 2>/dev/null || true
+	mv -f "$temporary" "$armbian_env"
+	exec {env_lock_fd}>&-
+}
+
+list_overlays() {
+	local profile token dtbo title description conflicts state
+	profile=$(profile_file)
+	[[ -f "$profile" ]] || die "板卡 overlay 清单不存在: $profile"
+	printf '%-18s %-8s %-28s %s\n' TOKEN STATE NAME DESCRIPTION
+	while IFS='|' read -r token dtbo title description conflicts; do
+		[[ -z "$token" || "$token" == \#* ]] && continue
+		state=disabled
+		is_overlay_active "$token" && state=enabled
+		[[ -f "$overlay_dir/$dtbo.dtbo" ]] || state=missing
+		printf '%-18s %-8s %-28s %s\n' "$token" "$state" "$title" "$description"
+	done < "$profile"
+}
+
+enable_overlay() {
+	local wanted=$1 record token dtbo title description conflicts conflict
+	require_root
+	record=$(overlay_record "$wanted")
+	IFS='|' read -r token dtbo title description conflicts <<< "$record"
+	[[ -f "$overlay_dir/$dtbo.dtbo" ]] || die "DTBO 文件不存在: $overlay_dir/$dtbo.dtbo"
+	if is_overlay_active "$token"; then
+		echo "$token 已启用"
+		return
+	fi
+	IFS=',' read -ra conflict_list <<< "$conflicts"
+	for conflict in "${conflict_list[@]}"; do
+		[[ -z "$conflict" ]] && continue
+		is_overlay_active "$conflict" && die "$token 与已启用的 $conflict 冲突"
+	done
+	mapfile -t current < <(active_overlays)
+	current+=("$token")
+	write_env_key overlays "${current[*]}"
+	echo "已启用 $token；重启后生效"
+}
+
+disable_overlay() {
+	local wanted=$1 token
+	require_root
+	overlay_record "$wanted" >/dev/null
+	mapfile -t current < <(active_overlays)
+	remaining=()
+	for token in "${current[@]}"; do
+		[[ "$token" == "$wanted" ]] || remaining+=("$token")
+	done
+	write_env_key overlays "${remaining[*]}"
+	echo "已禁用 $wanted；重启后生效"
+}
+
+validate_dshanpi_source() {
+	local expected_components actual_components
+	[[ -f "$dshanpi_source" ]] || die "DShanPI 软件源不存在: $dshanpi_source"
+	grep -Eq "^URIs:[[:space:]]+$DSHANPI_APT_URI[[:space:]]*$" "$dshanpi_source" ||
+		die "DShanPI 软件源地址不是 $DSHANPI_APT_URI"
+	grep -Eq "^Signed-By:[[:space:]]+$DSHANPI_KEYRING[[:space:]]*$" "$dshanpi_source" ||
+		die "DShanPI 软件源未绑定官方 keyring"
+	! grep -Eqi '^Trusted:[[:space:]]+yes' "$dshanpi_source" || die "拒绝使用 Trusted: yes"
+	expected_components=$(profile_value apt_components)
+	actual_components=$(awk '$1 == "Components:" {$1=""; sub(/^[[:space:]]+/, ""); print; exit}' "$dshanpi_source")
+	[[ "$actual_components" == "$expected_components" ]] ||
+		die "DShanPI 软件源组件应为: $expected_components"
+}
+
+source_channel() {
+	awk '$1 == "Suites:" { print $2; exit }' "$dshanpi_source" 2>/dev/null |
+		sed -e 's/^noble$/stable/' -e 's/^noble-testing$/testing/'
+}
+
+replace_deb822_field() {
+	local file=$1 field=$2 value=$3 directory temporary lock_file
+	lock_file="${file}.dspi-config.lock"
+	exec {source_lock_fd}> "$lock_file"
+	flock -x "$source_lock_fd"
+	directory=$(dirname "$file")
+	temporary=$(mktemp "$directory/.sources.dspi-config.XXXXXX")
+	awk -v field="$field" -v value="$value" '
+		index($0, field ":") == 1 {
+			print field ": " value
+			found = 1
+			next
+		}
+		{ print }
+		END { if (!found) print field ": " value }
+	' "$file" > "$temporary"
+	install -m 0644 "$temporary" "$file"
+	rm -f "$temporary"
+	exec {source_lock_fd}>&-
+}
+
+show_sources() {
+	validate_dshanpi_source
+	echo "DShanPI channel: $(source_channel)"
+	awk -F '|' 'NR == FNR { names[$3] = $2; next } $1 == "URIs:" { print "Ubuntu mirror: " (names[$2] ? names[$2] : $2); exit }' \
+		"$mirrors_file" "$ubuntu_source" 2>/dev/null || true
+}
+
+set_channel() {
+	local channel=$1 suite
+	require_root
+	validate_dshanpi_source
+	case "$channel" in
+		stable) suite=noble ;;
+		testing) suite=noble-testing ;;
+		*) die "channel 必须是 stable 或 testing" ;;
+	esac
+	replace_deb822_field "$dshanpi_source" Suites "$suite"
+	echo "DShanPI 软件源已切换到 $channel"
+	[[ ${DSPI_SKIP_APT_UPDATE:-no} == yes ]] || apt-get update
+}
+
+set_mirror() {
+	local mirror=$1 uri
+	require_root
+	[[ -f "$ubuntu_source" ]] || die "Ubuntu 软件源不存在: $ubuntu_source"
+	uri=$(awk -F '|' -v wanted="$mirror" '$1 == wanted { print $3; exit }' "$mirrors_file")
+	[[ "$uri" == https://* ]] || die "未知 Ubuntu 镜像: $mirror"
+	replace_deb822_field "$ubuntu_source" URIs "$uri"
+	echo "Ubuntu Ports 镜像已切换到 $mirror"
+	[[ ${DSPI_SKIP_APT_UPDATE:-no} == yes ]] || apt-get update
+}
+
+release_package() {
+	local core desktop
+	core=$(profile_value release_meta_core)
+	desktop=$(profile_value release_meta_desktop)
+	if dpkg-query -W -f='${db:Status-Status}' "$desktop" 2>/dev/null | grep -qx installed; then
+		echo "$desktop"
+	elif dpkg-query -W -f='${db:Status-Status}' "$core" 2>/dev/null | grep -qx installed; then
+		echo "$core"
+	else
+		return 1
+	fi
+}
+
+installed_release() {
+	local package
+	package=$(release_package) || return 0
+	dpkg-query -W -f='${Version}\n' "$package" 2>/dev/null || true
+}
+
+available_releases() {
+	apt-cache madison "$(release_package)" 2>/dev/null |
+		awk -F '|' '{ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); if ($2 != "") print $2 }' |
+		awk '!seen[$0]++'
+}
+
+list_updates() {
+	local package installed version
+	package=$(release_package) || die "系统未安装 DShanPI 发行版本元包"
+	installed=$(installed_release)
+	echo "Package:   $package"
+	echo "Installed: ${installed:-not-installed}"
+	echo "Available:"
+	while IFS= read -r version; do
+		printf '  %s\n' "$version"
+	done < <(available_releases)
+}
+
+install_release() {
+	local version=$1 package available=no candidate
+	require_root
+	package=$(release_package) || die "系统未安装 DShanPI 发行版本元包"
+	while IFS= read -r candidate; do
+		[[ "$candidate" == "$version" ]] && available=yes
+	done < <(available_releases)
+	[[ "$available" == yes ]] || die "仓库中没有 $package=$version"
+	apt-get --simulate install --allow-downgrades "$package=$version"
+	if [[ ${DSPI_ASSUME_YES:-no} != yes ]]; then
+		[[ -t 0 ]] || die "非交互模式必须设置 DSPI_ASSUME_YES=yes"
+		read -r -p "安装系统版本 $version？[y/N] " answer
+		[[ "$answer" == y || "$answer" == Y ]] || { echo "已取消"; return 1; }
+	fi
+	apt-get install --allow-downgrades "$package=$version"
+	echo "系统版本安装完成；请重启并验证硬件"
+}
+
+rollback_release() {
+	local installed previous= candidate
+	installed=$(installed_release)
+	[[ -n "$installed" ]] || die "未安装 DShanPI 系统版本元包"
+	while IFS= read -r candidate; do
+		dpkg --compare-versions "$candidate" lt "$installed" || continue
+		if [[ -z "$previous" ]] || dpkg --compare-versions "$candidate" gt "$previous"; then
+			previous=$candidate
+		fi
+	done < <(available_releases)
+	[[ -n "$previous" ]] || die "没有可回滚的旧版本"
+	install_release "$previous"
+}
+
+show_status() {
+	local board fdt overlays release
+	board=$(board_name)
+	fdt=$(read_env_value fdtfile)
+	overlays=$(read_env_value overlays)
+	release=$(installed_release)
+	printf 'Board:       %s\n' "${board:-unknown}"
+	printf 'FDT:         %s\n' "${fdt:-unknown}"
+	printf 'Overlays:    %s\n' "${overlays:-none}"
+	printf 'APT channel: %s\n' "$(source_channel 2>/dev/null || echo unknown)"
+	printf 'System:      %s\n' "${release:-not-installed}"
+	printf 'Kernel:      %s\n' "$(uname -r)"
+}
+
+interactive_menu() {
+	command -v whiptail >/dev/null || { usage; return 0; }
+	local choice token version
+	while choice=$(whiptail --title "DShanPI Config" --menu "系统配置" 20 76 10 \
+		status "查看系统状态" overlays "设备树 Overlay" source "软件源" \
+		updates "系统升级/回滚" exit "退出" 3>&1 1>&2 2>&3); do
+		case "$choice" in
+			status) whiptail --msgbox "$(show_status)" 18 72 ;;
+			overlays)
+				token=$(whiptail --inputbox "输入 overlay token；前缀 - 表示禁用\n\n$(list_overlays)" 24 92 3>&1 1>&2 2>&3) || continue
+				[[ "$token" == -* ]] && disable_overlay "${token#-}" || enable_overlay "$token"
+				;;
+			source)
+				choice=$(whiptail --menu "软件源" 18 72 8 stable "DShanPI stable" testing "DShanPI testing" official "Ubuntu 官方" tuna "清华 TUNA" ustc "中科大" 3>&1 1>&2 2>&3) || continue
+				case "$choice" in stable|testing) set_channel "$choice" ;; *) set_mirror "$choice" ;; esac
+				;;
+			updates)
+				version=$(whiptail --inputbox "留空回滚到上一版本，或输入要安装的精确版本\n\n$(list_updates)" 24 92 3>&1 1>&2 2>&3) || continue
+				[[ -n "$version" ]] && install_release "$version" || rollback_release
+				;;
+			exit) return 0 ;;
+		esac
+	done
+}
+
+case ${1:-menu} in
+	menu) [[ $# -eq 0 ]] || { usage; exit 2; }; interactive_menu ;;
+	status) [[ $# -eq 1 ]] || { usage; exit 2; }; show_status ;;
+	overlay)
+		case ${2:-} in
+			list) [[ $# -eq 2 ]] || { usage; exit 2; }; list_overlays ;;
+			enable) [[ $# -eq 3 ]] || { usage; exit 2; }; enable_overlay "$3" ;;
+			disable) [[ $# -eq 3 ]] || { usage; exit 2; }; disable_overlay "$3" ;;
+			*) usage; exit 2 ;;
+		esac
+		;;
+	source)
+		case ${2:-} in
+			show) [[ $# -eq 2 ]] || { usage; exit 2; }; show_sources ;;
+			channel) [[ $# -eq 3 ]] || { usage; exit 2; }; set_channel "$3" ;;
+			mirror) [[ $# -eq 3 ]] || { usage; exit 2; }; set_mirror "$3" ;;
+			*) usage; exit 2 ;;
+		esac
+		;;
+	update)
+		case ${2:-} in
+			list) [[ $# -eq 2 ]] || { usage; exit 2; }; list_updates ;;
+			install) [[ $# -eq 3 ]] || { usage; exit 2; }; install_release "$3" ;;
+			rollback) [[ $# -eq 2 ]] || { usage; exit 2; }; rollback_release ;;
+			*) usage; exit 2 ;;
+		esac
+		;;
+	-h|--help|help) usage ;;
+	*) usage >&2; exit 2 ;;
+esac
