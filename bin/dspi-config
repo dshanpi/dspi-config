@@ -8,7 +8,7 @@ readonly DSHANPI_KEYRING=/usr/share/keyrings/dshanpi-archive-keyring.gpg
 armbian_env=${DSPI_ARMBIAN_ENV:-/boot/armbianEnv.txt}
 armbian_release=${DSPI_ARMBIAN_RELEASE:-/etc/armbian-release}
 profile_root=${DSPI_PROFILE_ROOT:-/usr/share/dspi-config/boards}
-overlay_dir=${DSPI_OVERLAY_DIR:-/boot/dtb/rockchip/overlay}
+overlay_dir_override=${DSPI_OVERLAY_DIR:-}
 dshanpi_source=${DSPI_DSHANPI_SOURCE:-/etc/apt/sources.list.d/dshanpi.sources}
 ubuntu_source=${DSPI_UBUNTU_SOURCE:-/etc/apt/sources.list.d/ubuntu.sources}
 mirrors_file=${DSPI_MIRRORS_FILE:-/usr/share/dspi-config/mirrors.tsv}
@@ -46,6 +46,22 @@ board_name() {
 		return
 	fi
 	awk -F= '$1 == "BOARD" { gsub(/^"|"$/, "", $2); print $2; exit }' "$armbian_release" 2>/dev/null
+}
+
+overlay_directory() {
+	local directory
+	if [[ -n "$overlay_dir_override" ]]; then
+		directory=$overlay_dir_override
+		[[ "$directory" == /* && "$directory" != / && "$directory" != *"/../"* && "$directory" != */.. ]] ||
+			die "板卡 overlay 目录非法: $directory"
+	else
+		directory=$(awk -F= '$1 == "OVERLAY_DIR" { value = substr($0, index($0, "=") + 1); gsub(/^"|"$/, "", value); print value; exit }' \
+			"$armbian_release" 2>/dev/null)
+		directory=${directory:-/boot/dtb/rockchip/overlay}
+		[[ "$directory" =~ ^/boot/dtb/[A-Za-z0-9._/-]+/overlay$ && "$directory" != *..* ]] ||
+			die "板卡 overlay 目录非法: $directory"
+	fi
+	printf '%s\n' "$directory"
 }
 
 profile_file() {
@@ -133,25 +149,27 @@ write_env_key() {
 }
 
 list_overlays() {
-	local profile token dtbo title description conflicts state
+	local profile directory token dtbo title description conflicts state
 	profile=$(profile_file)
+	directory=$(overlay_directory)
 	[[ -f "$profile" ]] || die "板卡 overlay 清单不存在: $profile"
 	printf '%-18s %-8s %-28s %s\n' TOKEN STATE NAME DESCRIPTION
 	while IFS='|' read -r token dtbo title description conflicts; do
 		[[ -z "$token" || "$token" == \#* ]] && continue
 		state=disabled
 		is_overlay_active "$token" && state=enabled
-		[[ -f "$overlay_dir/$dtbo.dtbo" ]] || state=missing
+		[[ -f "$directory/$dtbo.dtbo" ]] || state=missing
 		printf '%-18s %-8s %-28s %s\n' "$token" "$state" "$title" "$description"
 	done < "$profile"
 }
 
 enable_overlay() {
-	local wanted=$1 record token dtbo title description conflicts conflict
+	local wanted=$1 record directory token dtbo title description conflicts conflict
 	require_root
+	directory=$(overlay_directory)
 	record=$(overlay_record "$wanted")
 	IFS='|' read -r token dtbo title description conflicts <<< "$record"
-	[[ -f "$overlay_dir/$dtbo.dtbo" ]] || die "DTBO 文件不存在: $overlay_dir/$dtbo.dtbo"
+	[[ -f "$directory/$dtbo.dtbo" ]] || die "DTBO 文件不存在: $directory/$dtbo.dtbo"
 	if is_overlay_active "$token"; then
 		echo "$token 已启用"
 		return

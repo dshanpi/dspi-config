@@ -20,7 +20,10 @@ fdtfile=rockchip/rk3576-100ask-dshanpi-a1-cm5.dtb
 overlays=existing
 custom_key=keep-me
 EOF
-printf '%s\n' 'BOARD=dshanpi-a1-cm5' > "$armbian_release"
+cat > "$armbian_release" <<'EOF'
+BOARD=dshanpi-a1-cm5
+OVERLAY_DIR="/boot/dtb/rockchip/overlay"
+EOF
 cat > "$profile_root/dshanpi-a1-cm5/overlays.tsv" <<'EOF'
 pcie1|dshanpi-a1-cm5-pcie1|PCIe1 模式|禁用 USB1 并启用 PCIe1|
 camera|dshanpi-a1-cm5-camera|测试摄像头|冲突测试|pcie1
@@ -95,6 +98,34 @@ if run_config overlay enable camera >/dev/null 2>&1; then
 fi
 run_config overlay disable pcie1 >/dev/null
 grep -Fx 'overlays=existing' "$armbian_env" >/dev/null
+
+# The overlay path comes from the BSP-generated armbian-release file, so the
+# same package also works on Allwinner products without a Rockchip path baked
+# into dspi-config.
+cat > "$armbian_release" <<'EOF'
+BOARD=avaota-a1
+OVERLAY_DIR="/boot/dtb/allwinner/overlay"
+EOF
+mkdir -p "$profile_root/avaota-a1"
+cat > "$profile_root/avaota-a1/overlays.tsv" <<'EOF'
+# No product overlays are enabled yet.
+EOF
+cat > "$profile_root/avaota-a1/system.conf" <<'EOF'
+apt_components=common avaota-a1
+release_meta_core=avaota-a1-release-core
+release_meta_desktop=avaota-a1-release-desktop
+EOF
+PATH="$fake_bin:$PATH" \
+	DSPI_ARMBIAN_ENV="$armbian_env" \
+	DSPI_ARMBIAN_RELEASE="$armbian_release" \
+	DSPI_PROFILE_ROOT="$profile_root" \
+	bash "$source_root/bin/dspi-config" overlay list | grep -F 'TOKEN' >/dev/null
+
+# Continue update/source tests with the CM5 fixture.
+cat > "$armbian_release" <<'EOF'
+BOARD=dshanpi-a1-cm5
+OVERLAY_DIR="/boot/dtb/rockchip/overlay"
+EOF
 
 run_config source channel testing >/dev/null
 grep -Fx 'Suites: noble-testing' "$dshanpi_source" >/dev/null

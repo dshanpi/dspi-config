@@ -12,6 +12,10 @@
 
 它不生成 DTBO、不发布 APT 仓库、不保存仓库私钥，也不允许关闭 APT 签名校验。
 
+当前产品标识及板卡名统一为：`dshanpi-a1-cm5`、`dshanpi-a1`、`dshanpi-r1` 和
+`avaota-a1`。用户口头所称的 “AvaotaA1” 在配置、包名和 APT component 中均使用
+规范名称 `avaota-a1`。
+
 ## 命令
 
 ```bash
@@ -47,8 +51,11 @@ overlay 修改写入 `/boot/armbianEnv.txt`，生效前会验证 DTBO 文件与�
 token|dtbo-basename|中文名称|说明|conflict-token-list
 ```
 
-`token` 是写入 `armbianEnv.txt` 的 overlay 名称；`dtbo-basename` 是
-`/boot/dtb/rockchip/overlay/` 下不带 `.dtbo` 的实际文件名；冲突列表使用逗号分隔。
+`token` 是写入 `armbianEnv.txt` 的 overlay 名称；`dtbo-basename` 是板卡
+`/etc/armbian-release` 中 `OVERLAY_DIR` 目录下不带 `.dtbo` 的实际文件名；Rockchip
+通常为 `/boot/dtb/rockchip/overlay`，Allwinner 通常为
+`/boot/dtb/allwinner/overlay`。冲突列表使用逗号分隔。空清单表示该产品当前只使用主
+设备树，仍可使用软件源和系统版本管理功能。
 
 `system.conf` 只允许数据项，不会被当作 shell 脚本执行：
 
@@ -57,6 +64,9 @@ apt_components=common dshanpi-a1-cm5
 release_meta_core=dshanpi-a1-cm5-release-core
 release_meta_desktop=dshanpi-a1-cm5-release-desktop
 ```
+
+各产品的实际 `apt_components` 和 release 元包名由对应 BSP 提供，不能在
+`dspi-config` 程序中硬编码。
 
 ## 软件源
 
