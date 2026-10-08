@@ -324,12 +324,15 @@ install_release() {
 		[[ "$candidate" == "$version" ]] && available=yes
 	done < <(available_releases)
 	[[ "$available" == yes ]] || die "仓库中没有 $package=$version"
-	depends=$(apt-cache show "$package=$version" | awk '
+	# Read the complete producer output before selecting Depends. With pipefail,
+	# an early awk exit can make apt-cache fail with SIGPIPE on larger records.
+	depends=$(apt-cache show "$package=$version")
+	depends=$(awk '
 		/^Depends:/ { sub(/^Depends:[[:space:]]*/, ""); value=$0; active=1; next }
 		active && /^[[:space:]]/ { sub(/^[[:space:]]*/, ""); value=value " " $0; next }
 		active { print value; done=1; exit }
 		END { if (active && !done) print value }
-	')
+	' <<< "$depends")
 	[[ -n "$depends" ]] || die "发行版本元包缺少精确依赖"
 	IFS=',' read -r -a locked_dependencies <<< "$depends"
 	targets=("$package=$version")
