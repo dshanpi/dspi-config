@@ -58,6 +58,11 @@ cat > "$fake_bin/apt-cache" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${1:-} == show ]]; then
     printf 'Package: dshanpi-a1-cm5-release-core\nDepends: linux-image-vendor-rk3576-dshanpi-a1-cm5 (= %s)\nDescription: fixture\n' "${2#*=}"
+    # A real record can span multiple writes. An early consumer exit must not
+    # abort installation with SIGPIPE under the caller's pipefail setting.
+    for ((i=0; i<4096; i++)); do
+        printf ' extended package description beyond the Depends field\n' || exit 141
+    done
     exit 0
 fi
 [[ ${1:-} == madison ]] || exit 2
