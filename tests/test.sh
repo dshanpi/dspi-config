@@ -36,7 +36,7 @@ EOF
 touch "$overlay_dir/dshanpi-a1-cm5-pcie1.dtbo" "$overlay_dir/dshanpi-a1-cm5-camera.dtbo"
 cat > "$dshanpi_source" <<'EOF'
 Types: deb deb-src
-URIs: https://dl.100ask.net/apt
+URIs: https://apt.100ask.net
 Suites: noble
 Components: common dshanpi-a1-cm5
 Architectures: arm64 all
@@ -56,11 +56,15 @@ printf '%s\n' "$*" >> "$DSPI_TEST_APT_LOG"
 EOF
 cat > "$fake_bin/apt-cache" <<'EOF'
 #!/usr/bin/env bash
+if [[ ${1:-} == show ]]; then
+    printf 'Package: dshanpi-a1-cm5-release-core\nDepends: linux-image-vendor-rk3576-dshanpi-a1-cm5 (= %s)\nDescription: fixture\n' "${2#*=}"
+    exit 0
+fi
 [[ ${1:-} == madison ]] || exit 2
 cat <<OUT
- ${2:-package} | 3.0.0-1 | https://dl.100ask.net/apt noble/main arm64 Packages
- ${2:-package} | 2.0.0-1 | https://dl.100ask.net/apt noble/main arm64 Packages
- ${2:-package} | 1.0.0-1 | https://dl.100ask.net/apt noble/main arm64 Packages
+ ${2:-package} | 3.0.0-1 | https://apt.100ask.net noble/main arm64 Packages
+ ${2:-package} | 2.0.0-1 | https://apt.100ask.net noble/main arm64 Packages
+ ${2:-package} | 1.0.0-1 | https://apt.100ask.net noble/main arm64 Packages
 OUT
 EOF
 cat > "$fake_bin/dpkg-query" <<'EOF'
@@ -128,18 +132,26 @@ OVERLAY_DIR="/boot/dtb/rockchip/overlay"
 EOF
 
 run_config source channel testing >/dev/null
+grep -Fx 'URIs: https://apt.100ask.net' "$dshanpi_source" >/dev/null
 grep -Fx 'Suites: noble-testing' "$dshanpi_source" >/dev/null
+# Existing images migrate to the new host when selecting a channel.
+sed -i 's|^URIs:.*|URIs: https://dl.100ask.net/apt|' "$dshanpi_source"
+run_config source show >/dev/null
 run_config source channel stable >/dev/null
+grep -Fx 'URIs: https://apt.100ask.net' "$dshanpi_source" >/dev/null
+grep -Fx 'Signed-By: /usr/share/keyrings/dshanpi-archive-keyring.gpg' "$dshanpi_source" >/dev/null
 grep -Fx 'Suites: noble' "$dshanpi_source" >/dev/null
 run_config source mirror tuna >/dev/null
 grep -Fx 'URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports' "$ubuntu_source" >/dev/null
 grep -Fx 'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' "$ubuntu_source" >/dev/null
 
+sed -i 's|^URIs:.*|URIs: https://dl.100ask.net/apt|' "$dshanpi_source"
 run_config update install 3.0.0-1 >/dev/null
-grep -Fx -- '--simulate install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1' "$apt_log" >/dev/null
-grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1' "$apt_log" >/dev/null
+grep -Fx 'URIs: https://apt.100ask.net' "$dshanpi_source" >/dev/null
+grep -Fx -- '--simulate install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1' "$apt_log" >/dev/null
+grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1' "$apt_log" >/dev/null
 run_config update rollback >/dev/null
-grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=1.0.0-1' "$apt_log" >/dev/null
+grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=1.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=1.0.0-1' "$apt_log" >/dev/null
 
 printf 'Trusted: yes\n' >> "$dshanpi_source"
 if run_config source channel testing >/dev/null 2>&1; then
