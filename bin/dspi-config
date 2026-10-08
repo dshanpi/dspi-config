@@ -2,7 +2,8 @@
 set -euo pipefail
 
 readonly PROGRAM=dspi-config
-readonly DSHANPI_APT_URI=https://dl.100ask.net/apt
+readonly DSHANPI_APT_URI=https://apt.100ask.net
+readonly DSHANPI_LEGACY_APT_URI=https://dl.100ask.net/apt
 readonly DSHANPI_KEYRING=/usr/share/keyrings/dshanpi-archive-keyring.gpg
 
 armbian_env=${DSPI_ARMBIAN_ENV:-/boot/armbianEnv.txt}
@@ -199,9 +200,10 @@ disable_overlay() {
 }
 
 validate_dshanpi_source() {
-	local expected_components actual_components
+	local expected_components actual_components uri
 	[[ -f "$dshanpi_source" ]] || die "DShanPI 软件源不存在: $dshanpi_source"
-	grep -Eq "^URIs:[[:space:]]+$DSHANPI_APT_URI[[:space:]]*$" "$dshanpi_source" ||
+	uri=$(awk '$1 == "URIs:" {$1=""; sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print}' "$dshanpi_source")
+	[[ "$uri" == "$DSHANPI_APT_URI" || "$uri" == "$DSHANPI_LEGACY_APT_URI" ]] ||
 		die "DShanPI 软件源地址不是 $DSHANPI_APT_URI"
 	grep -Eq "^Signed-By:[[:space:]]+$DSHANPI_KEYRING[[:space:]]*$" "$dshanpi_source" ||
 		die "DShanPI 软件源未绑定官方 keyring"
@@ -240,6 +242,7 @@ replace_deb822_field() {
 
 show_sources() {
 	validate_dshanpi_source
+	awk '$1 == "URIs:" { print "DShanPI URI: " $2 }' "$dshanpi_source"
 	echo "DShanPI channel: $(source_channel)"
 	awk -F '|' 'NR == FNR { names[$3] = $2; next } $1 == "URIs:" { print "Ubuntu mirror: " (names[$2] ? names[$2] : $2); exit }' \
 		"$mirrors_file" "$ubuntu_source" 2>/dev/null || true
@@ -254,6 +257,7 @@ set_channel() {
 		testing) suite=noble-testing ;;
 		*) die "channel 必须是 stable 或 testing" ;;
 	esac
+	replace_deb822_field "$dshanpi_source" URIs "$DSHANPI_APT_URI"
 	replace_deb822_field "$dshanpi_source" Suites "$suite"
 	echo "DShanPI 软件源已切换到 $channel"
 	[[ ${DSPI_SKIP_APT_UPDATE:-no} == yes ]] || apt-get update
@@ -308,20 +312,40 @@ list_updates() {
 }
 
 install_release() {
-	local version=$1 package available=no candidate
+	local version=$1 package available=no candidate depends dependency
+	local dependency_pattern='^[[:space:]]*([a-z0-9][a-z0-9+.-]*)[[:space:]]+\(=[[:space:]]+([^[:space:]()]+)\)[[:space:]]*$'
+	local -a locked_dependencies targets
 	require_root
+	validate_dshanpi_source
+	replace_deb822_field "$dshanpi_source" URIs "$DSHANPI_APT_URI"
+	[[ ${DSPI_SKIP_APT_UPDATE:-no} == yes ]] || apt-get update
 	package=$(release_package) || die "系统未安装 DShanPI 发行版本元包"
 	while IFS= read -r candidate; do
 		[[ "$candidate" == "$version" ]] && available=yes
 	done < <(available_releases)
 	[[ "$available" == yes ]] || die "仓库中没有 $package=$version"
-	apt-get --simulate install --allow-downgrades "$package=$version"
+	depends=$(apt-cache show "$package=$version" | awk '
+		/^Depends:/ { sub(/^Depends:[[:space:]]*/, ""); value=$0; active=1; next }
+		active && /^[[:space:]]/ { sub(/^[[:space:]]*/, ""); value=value " " $0; next }
+		active { print value; done=1; exit }
+		END { if (active && !done) print value }
+	')
+	[[ -n "$depends" ]] || die "发行版本元包缺少精确依赖"
+	IFS=',' read -r -a locked_dependencies <<< "$depends"
+	targets=("$package=$version")
+	for dependency in "${locked_dependencies[@]}"; do
+		[[ "$dependency" =~ $dependency_pattern ]] || die "发行版本依赖未固定精确版本: $dependency"
+		targets+=("${BASH_REMATCH[1]}=${BASH_REMATCH[2]}")
+	done
+	# Pin the whole cohort explicitly: APT does not reliably downgrade dependencies
+	# just because a release marker itself was requested at an older version.
+	apt-get --simulate install --allow-downgrades "${targets[@]}"
 	if [[ ${DSPI_ASSUME_YES:-no} != yes ]]; then
 		[[ -t 0 ]] || die "非交互模式必须设置 DSPI_ASSUME_YES=yes"
 		read -r -p "安装系统版本 $version？[y/N] " answer
 		[[ "$answer" == y || "$answer" == Y ]] || { echo "已取消"; return 1; }
 	fi
-	apt-get install --allow-downgrades "$package=$version"
+	apt-get install --allow-downgrades "${targets[@]}"
 	echo "系统版本安装完成；请重启并验证硬件"
 }
 

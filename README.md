@@ -70,9 +70,15 @@ release_meta_desktop=dshanpi-a1-cm5-release-desktop
 
 ## 软件源
 
-DShanPI 软件源固定为 `https://dl.100ask.net/apt`，stable 使用 suite `noble`，testing 使用
+DShanPI 软件源固定为 `https://apt.100ask.net`，stable 使用 suite `noble`，testing 使用
 `noble-testing`；components 必须与板卡 `system.conf` 一致。Ubuntu Ports 提供官方、清华和
 中科大三个预设。所有源都保留 `Signed-By`，不支持 `Trusted: yes`。
+
+旧镜像中的 `https://dl.100ask.net/apt` 仍可识别；使用新版工具执行
+`sudo dspi-config source channel stable`（或 `testing`）时会将地址迁到
+`https://apt.100ask.net`，保留官方签名校验和板卡 components。
+从 `1.0.2-1` 起，安装指定系统版本前也会迁移旧地址并刷新 APT 索引。
+升级与回滚会从元包读取全部精确依赖，并将整组版本显式交给 APT，避免只降级版本标记却保留较新的依赖包。
 
 ## 构建与测试
 
