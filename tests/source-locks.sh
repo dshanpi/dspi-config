@@ -44,6 +44,28 @@ exec {held_lock}>&-
 bash "$source_root/bin/dspi-config" source channel stable >/dev/null
 grep -Fx 'Suites: noble' "$DSPI_DSHANPI_SOURCE" >/dev/null
 
+# Every supported board uses the same source writer, with its own component
+# validation. Exercise channel and Ubuntu mirror changes for all four profiles.
+for board in dshanpi-a1 dshanpi-a1-cm5 dshanpi-r1 avaota-a1; do
+	board_dir="$test_root/products/$board"
+	mkdir -p "$board_dir" "$test_root/profiles/$board"
+	printf 'apt_components=common %s\n' "$board" > "$test_root/profiles/$board/system.conf"
+	sed "s/Components: common dshanpi-a1$/Components: common $board/" \
+		"$DSPI_DSHANPI_SOURCE" > "$board_dir/dshanpi.sources"
+	printf 'Types: deb\nURIs: https://ports.ubuntu.com/ubuntu-ports\nSuites: noble\nComponents: main\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' > "$board_dir/ubuntu.sources"
+	(
+		export DSPI_BOARD="$board" DSPI_DSHANPI_SOURCE="$board_dir/dshanpi.sources"
+		export DSPI_UBUNTU_SOURCE="$board_dir/ubuntu.sources" DSPI_MIRRORS_FILE="$source_root/config/mirrors.tsv"
+		bash "$source_root/bin/dspi-config" source channel testing >/dev/null
+		grep -Fx 'Suites: noble-testing' "$DSPI_DSHANPI_SOURCE" >/dev/null
+		bash "$source_root/bin/dspi-config" source channel stable >/dev/null
+		grep -Fx 'Suites: noble' "$DSPI_DSHANPI_SOURCE" >/dev/null
+		bash "$source_root/bin/dspi-config" source mirror tuna >/dev/null
+		grep -Fx 'URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports' "$DSPI_UBUNTU_SOURCE" >/dev/null
+		[[ $(find "$board_dir" -type f | wc -l) -eq 2 ]]
+	)
+done
+
 # Exercise the real APT source scanner without contacting any repository.
 printf 'legacy lock fixture\n' > "$DSPI_DSHANPI_SOURCE.dspi-config.lock"
 printf 'unrelated invalid source fixture\n' > "$test_root/sources/unrelated.invalid"
