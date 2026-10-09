@@ -13,6 +13,7 @@ overlay_dir_override=${DSPI_OVERLAY_DIR:-}
 dshanpi_source=${DSPI_DSHANPI_SOURCE:-/etc/apt/sources.list.d/dshanpi.sources}
 ubuntu_source=${DSPI_UBUNTU_SOURCE:-/etc/apt/sources.list.d/ubuntu.sources}
 mirrors_file=${DSPI_MIRRORS_FILE:-/usr/share/dspi-config/mirrors.tsv}
+source_lock_dir=${DSPI_SOURCE_LOCK_DIR:-/run/dspi-config}
 
 usage() {
 	cat <<'EOF'
@@ -220,8 +221,12 @@ source_channel() {
 }
 
 replace_deb822_field() {
-	local file=$1 field=$2 value=$3 directory temporary lock_file
-	lock_file="${file}.dspi-config.lock"
+	local file=$1 field=$2 value=$3 directory temporary lock_file lock_key
+	# Runtime locks must not appear among APT source definitions. Hash the full
+	# canonical path so distinct source files cannot accidentally share a lock.
+	mkdir -p -m 0700 -- "$source_lock_dir"
+	lock_key=$(printf '%s' "$(realpath -m -- "$file")" | sha256sum)
+	lock_file="$source_lock_dir/source-${lock_key%% *}.lock"
 	exec {source_lock_fd}> "$lock_file"
 	flock -x "$source_lock_fd"
 	directory=$(dirname "$file")
@@ -235,8 +240,8 @@ replace_deb822_field() {
 		{ print }
 		END { if (!found) print field ": " value }
 	' "$file" > "$temporary"
-	install -m 0644 "$temporary" "$file"
-	rm -f "$temporary"
+	chmod 0644 "$temporary"
+	mv -f -- "$temporary" "$file"
 	exec {source_lock_fd}>&-
 }
 

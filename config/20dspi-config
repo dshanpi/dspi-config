@@ -1,0 +1,3 @@
+// Older clients left live advisory locks beside source definitions. Ignore
+// only that auxiliary suffix; never delete a lock another process may hold.
+Dir::Ignore-Files-Silently:: "\.dspi-config\.lock$";

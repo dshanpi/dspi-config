@@ -92,6 +92,7 @@ run_config() {
 	DSPI_DSHANPI_SOURCE="$dshanpi_source" \
 	DSPI_UBUNTU_SOURCE="$ubuntu_source" \
 	DSPI_MIRRORS_FILE="$source_root/config/mirrors.tsv" \
+	DSPI_SOURCE_LOCK_DIR="$test_root/runtime-locks" \
 	DSPI_ALLOW_NON_ROOT=yes DSPI_SKIP_APT_UPDATE=yes DSPI_ASSUME_YES=yes \
 	DSPI_TEST_APT_LOG="$apt_log" \
 	bash "$source_root/bin/dspi-config" "$@"
@@ -176,5 +177,8 @@ package="$output_dir/dspi-config_$(< "$source_root/VERSION")_all.deb"
 [[ $(dpkg-deb -f "$package" Architecture) == all ]]
 dpkg-deb --contents "$package" | grep -F './usr/sbin/dspi-config' >/dev/null
 dpkg-deb --contents "$package" | grep -F './usr/share/dspi-config/mirrors.tsv' >/dev/null
+dpkg-deb --contents "$package" | grep -F './etc/apt/apt.conf.d/20dspi-config' >/dev/null
+
+bash "$source_root/tests/source-locks.sh"
 
 echo "dspi-config tests passed"
