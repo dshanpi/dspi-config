@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+python3 "$source_root/tools/check-delivery-policy.py"
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 armbian_env="$test_root/armbianEnv.txt"

@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_root=$(cd "$script_dir/.." && pwd)
+python3 "$source_root/tools/check-delivery-policy.py" >/dev/null
 output_dir=${1:-$source_root/output}
 version=$(< "$source_root/VERSION")
 source_date_epoch=${SOURCE_DATE_EPOCH:-1790726400}

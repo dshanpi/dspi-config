@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "policy_id": "dshanpi-delivery-v1",
+  "role": "dspi-config",
+  "sha256": "8b60c3a26a148ef225a8296a62cf4100308ca4dfed593c4f3a8cbe3d9a32aafc",
+  "references": [
+    "AGENTS.md",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ],
+  "hooks": [
+    ".github/workflows/test.yml",
+    "packaging/build-deb.sh",
+    "tests/test.sh"
+  ]
+}

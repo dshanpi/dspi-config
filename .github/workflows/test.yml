@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Check delivery policy
+        run: python3 tools/check-delivery-policy.py
       - name: Check shell syntax and package behavior
         run: |
           bash -n bin/dspi-config packaging/build-deb.sh tests/*.sh
