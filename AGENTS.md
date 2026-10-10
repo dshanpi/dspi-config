@@ -17,3 +17,11 @@ profile，管理 Overlay、签名 APT 源、整组升级和回滚。构建/发�
 
 提交前运行 `bash tests/test.sh`、shell 语法和 `git diff --check`；跨仓政策更新使用
 `python3 tools/check-delivery-policy.py --peer /path/to/repo` 核对。实板未验证项必须明示。
+
+按 DELIVERY_POLICY.md G13 执行源码归属：板级/内核/设备树归 ArmBianOS，可选驱动
+锁定/补丁/DEB/发行归 dshanpi-build，用户交互归 dspi-config，板卡差异用 BSP profile。
+组件按目录、短期分支和 PR 管理；实现与验证证据分开提交，历史 lock/包/tag 不覆盖。
+暂存后运行 `python3 tools/check-repository-hygiene.py`；只暂存明确审查的文件，
+缓存、构建输出、私钥和个人凭据不提交。技能与开发交接记录随仓库维护。
+
+维护本仓库时读取 `.agents/skills/maintain-dspi-config/SKILL.md`；开发交接见 `docs/development-handoff.md`。

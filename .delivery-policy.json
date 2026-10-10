@@ -2,14 +2,19 @@
   "schema_version": 1,
   "policy_id": "dshanpi-delivery-v1",
   "role": "dspi-config",
-  "sha256": "003320d4adcf6d82038e9d786633f15de5611909df7b093de355d16df777fe89",
+  "sha256": "00d4643efe42847526632406fdc4b54828a4461b95a9531092cff4b7d5537429",
   "references": [
     "AGENTS.md",
-    ".github/PULL_REQUEST_TEMPLATE.md"
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".agents/skills/maintain-dspi-config/SKILL.md",
+    "docs/development-handoff.md"
   ],
   "hooks": [
     ".github/workflows/test.yml",
     "packaging/build-deb.sh",
     "tests/test.sh"
+  ],
+  "hygiene_hooks": [
+    ".github/workflows/test.yml"
   ]
 }
