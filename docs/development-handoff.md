@@ -18,7 +18,7 @@
 python3 tools/check-delivery-policy.py
 bash -n bin/dspi-config packaging/build-deb.sh tests/*.sh
 bash tests/test.sh
-bash packaging/build-deb.sh output
+(umask 0002; bash packaging/build-deb.sh output)
 python3 tools/check-repository-hygiene.py
 git diff --check
 ```
@@ -31,3 +31,15 @@ README.md、bin/dspi-config、config/mirrors.tsv、config/20dspi-config 会进�
 
 新服务器三仓入口见 [统一手册](https://github.com/dshanpi/dshanpi-build/blob/main/docs/new-server.md)。
 安装、重启、升级及回滚的实板证据存入 dshanpi-build 对应发行目录。
+
+## 历史包复现的环境条件
+
+干净 Ubuntu 24.04.4 / dpkg-deb 1.22.6 容器复测发现：历史 1.0.2-3 采用 umask 0002，
+默认 0022 会改变包内目录权限，导致哈希不同。本次没有改打包脚本或旧包。
+复现历史包须显式使用上述 umask；生产安装继续复用签名仓库中的原始字节。
+在 0002 下，干净容器与历史包 SHA-256 均为
+`2ba5add81e925b66bd666b65a620f131fd41464d5c71cdba0541787e824a1d22`。
+默认 0022 的对照 SHA 为
+`ab9a0797ddac42323862ba8d58ec2120c7f4e55bbc9761672e0a9900b11fdd1a`。
+未来统一目录权限与 umask 无关的打包方式需提高 VERSION、更新精确元包后另行发布，
+不能覆盖 1.0.2-3。完整验证记录保存在 dshanpi-build 的交接验证文档。
