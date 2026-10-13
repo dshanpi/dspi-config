@@ -317,9 +317,9 @@ list_updates() {
 }
 
 install_release() {
-	local version=$1 package available=no candidate depends dependency
+	local version=$1 package available=no candidate control depends suggests dependency status optional_name optional_version
 	local dependency_pattern='^[[:space:]]*([a-z0-9][a-z0-9+.-]*)[[:space:]]+\(=[[:space:]]+([^[:space:]()]+)\)[[:space:]]*$'
-	local -a locked_dependencies targets
+	local -a locked_dependencies optional_dependencies targets
 	require_root
 	validate_dshanpi_source
 	replace_deb822_field "$dshanpi_source" URIs "$DSHANPI_APT_URI"
@@ -331,13 +331,18 @@ install_release() {
 	[[ "$available" == yes ]] || die "仓库中没有 $package=$version"
 	# Read the complete producer output before selecting Depends. With pipefail,
 	# an early awk exit can make apt-cache fail with SIGPIPE on larger records.
-	depends=$(apt-cache show "$package=$version")
-	depends=$(awk '
-		/^Depends:/ { sub(/^Depends:[[:space:]]*/, ""); value=$0; active=1; next }
+	control=$(apt-cache show "$package=$version")
+	control_field() {
+		local field=$1
+		awk -v field="$field" '
+		index($0, field ":") == 1 { sub("^" field ":[[:space:]]*", ""); value=$0; active=1; next }
 		active && /^[[:space:]]/ { sub(/^[[:space:]]*/, ""); value=value " " $0; next }
 		active { print value; done=1; exit }
 		END { if (active && !done) print value }
-	' <<< "$depends")
+		'
+	}
+	depends=$(control_field Depends <<< "$control")
+	suggests=$(control_field Suggests <<< "$control")
 	[[ -n "$depends" ]] || die "发行版本元包缺少精确依赖"
 	IFS=',' read -r -a locked_dependencies <<< "$depends"
 	targets=("$package=$version")
@@ -345,6 +350,21 @@ install_release() {
 		[[ "$dependency" =~ $dependency_pattern ]] || die "发行版本依赖未固定精确版本: $dependency"
 		targets+=("${BASH_REMATCH[1]}=${BASH_REMATCH[2]}")
 	done
+	# Release markers map optional hardware selectors without installing them on
+	# systems that do not use that hardware. Preserve only selectors already
+	# installed locally; their exact Depends pull the matching driver/runtime.
+	if [[ -n "$suggests" ]]; then
+		IFS=',' read -r -a optional_dependencies <<< "$suggests"
+		for dependency in "${optional_dependencies[@]}"; do
+			[[ "$dependency" =~ $dependency_pattern ]] ||
+				die "发行版本可选硬件依赖未固定精确版本: $dependency"
+			optional_name=${BASH_REMATCH[1]}
+			optional_version=${BASH_REMATCH[2]}
+			status=$(dpkg-query -W -f='${db:Status-Status}' "$optional_name" 2>/dev/null || true)
+			[[ "$status" == installed ]] || continue
+			targets+=("$optional_name=$optional_version")
+		done
+	fi
 	# Pin the whole cohort explicitly: APT does not reliably downgrade dependencies
 	# just because a release marker itself was requested at an older version.
 	apt-get --simulate install --allow-downgrades "${targets[@]}"

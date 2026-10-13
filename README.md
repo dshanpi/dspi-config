@@ -33,6 +33,9 @@ sudo dspi-config update install <version>
 sudo dspi-config update rollback
 ```
 
+发行元包会记录该版本对应的可选硬件选择包。升级或回滚时，`dspi-config`
+只同步本机已经安装的选择包及其驱动/运行库，不会在没有相应硬件的设备上自动安装可选套件。
+
 overlay 修改写入 `/boot/armbianEnv.txt`，生效前会验证 DTBO 文件与冲突关系，原文件备份为
 `/boot/armbianEnv.txt.dspi-config.bak`，并在操作完成后提示重启。
 

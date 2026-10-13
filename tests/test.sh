@@ -58,7 +58,7 @@ EOF
 cat > "$fake_bin/apt-cache" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${1:-} == show ]]; then
-    printf 'Package: dshanpi-a1-cm5-release-core\nDepends: linux-image-vendor-rk3576-dshanpi-a1-cm5 (= %s)\nDescription: fixture\n' "${2#*=}"
+    printf 'Package: dshanpi-a1-cm5-release-core\nDepends: linux-image-vendor-rk3576-dshanpi-a1-cm5 (= %s)\nSuggests: dshanpi-a1-cm5-accelerator (= 9.0.0-1)\nDescription: fixture\n' "${2#*=}"
     # A real record can span multiple writes. An early consumer exit must not
     # abort installation with SIGPIPE under the caller's pipefail setting.
     for ((i=0; i<4096; i++)); do
@@ -75,6 +75,11 @@ OUT
 EOF
 cat > "$fake_bin/dpkg-query" <<'EOF'
 #!/usr/bin/env bash
+if [[ "$*" == *dshanpi-a1-cm5-accelerator* ]]; then
+  [[ ${DSPI_TEST_OPTIONAL_INSTALLED:-yes} == yes ]] || exit 1
+  echo installed
+  exit 0
+fi
 case "$*" in
   *dshanpi-a1-cm5-release-desktop*) exit 1 ;;
   *db:Status-Status*) echo installed ;;
@@ -95,6 +100,7 @@ run_config() {
 	DSPI_MIRRORS_FILE="$source_root/config/mirrors.tsv" \
 	DSPI_SOURCE_LOCK_DIR="$test_root/runtime-locks" \
 	DSPI_ALLOW_NON_ROOT=yes DSPI_SKIP_APT_UPDATE=yes DSPI_ASSUME_YES=yes \
+	DSPI_TEST_OPTIONAL_INSTALLED="${DSPI_TEST_OPTIONAL_INSTALLED:-yes}" \
 	DSPI_TEST_APT_LOG="$apt_log" \
 	bash "$source_root/bin/dspi-config" "$@"
 }
@@ -155,10 +161,20 @@ grep -Fx 'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' "$ubuntu_so
 sed -i 's|^URIs:.*|URIs: https://dl.100ask.net/apt|' "$dshanpi_source"
 run_config update install 3.0.0-1 >/dev/null
 grep -Fx 'URIs: https://apt.100ask.net' "$dshanpi_source" >/dev/null
-grep -Fx -- '--simulate install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1' "$apt_log" >/dev/null
-grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1' "$apt_log" >/dev/null
+grep -Fx -- '--simulate install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1 dshanpi-a1-cm5-accelerator=9.0.0-1' "$apt_log" >/dev/null
+grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1 dshanpi-a1-cm5-accelerator=9.0.0-1' "$apt_log" >/dev/null
 run_config update rollback >/dev/null
-grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=1.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=1.0.0-1' "$apt_log" >/dev/null
+grep -Fx -- 'install --allow-downgrades dshanpi-a1-cm5-release-core=1.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=1.0.0-1 dshanpi-a1-cm5-accelerator=9.0.0-1' "$apt_log" >/dev/null
+
+# Suggests describe the compatible optional set but must not install hardware
+# support on a system where its selector is absent.
+: > "$apt_log"
+DSPI_TEST_OPTIONAL_INSTALLED=no run_config update install 3.0.0-1 >/dev/null
+grep -Fx -- '--simulate install --allow-downgrades dshanpi-a1-cm5-release-core=3.0.0-1 linux-image-vendor-rk3576-dshanpi-a1-cm5=3.0.0-1' "$apt_log" >/dev/null
+if grep -Fq 'dshanpi-a1-cm5-accelerator=' "$apt_log"; then
+	echo "Absent optional hardware selector was unexpectedly installed" >&2
+	exit 1
+fi
 
 printf 'Trusted: yes\n' >> "$dshanpi_source"
 if run_config source channel testing >/dev/null 2>&1; then
