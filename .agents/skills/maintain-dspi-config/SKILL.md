@@ -7,6 +7,11 @@ description: Maintain dspi-config board-profile behavior, Overlay configuration,
 
 Read root AGENTS.md and [DELIVERY_POLICY.md](../../../DELIVERY_POLICY.md). Run policy checks before editing and the repository hygiene checker after staging. See [the developer handoff](../../../docs/development-handoff.md) for tests and packaging boundaries.
 
+Every implementation conversation that changes this repository must create or update a
+G14 record in `docs/change-records/`. Link stable requirement IDs and record business
+logic, a Mermaid flow, invariants and failure branches, reproducible tests, evidence,
+and untested items. Run `python3 tools/check-change-record.py` before handoff.
+
 - Read board data from BSP profiles; do not embed board-specific Overlay choices, kernel patches or a competing downloader/publisher in the client.
 - Source writes use /run/dspi-config locks and atomic replacement. Preserve Signed-By. Legacy sources.list.d lock files may still be held by another process; do not blindly delete them.
 - Upgrade and rollback must pass the complete exact cohort to APT. A version marker alone cannot restore a consistent system. Avoid pipefail/SIGPIPE regressions when consuming apt-cache output.
