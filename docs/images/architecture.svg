@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="810" viewBox="0 0 1200 810" role="img" aria-labelledby="title desc">
+<title id="title">dspi-config 的工作框架</title><desc id="desc">一套 Bash 客户端读取本板 BSP 数据，分别管理启动配置、签名软件源和系统包。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#64748b"/></marker></defs>
+<rect width="1200" height="810" rx="20" fill="#f4f7fb"/>
+<text x="44" y="52" font-family="Noto Sans CJK SC, sans-serif" font-size="30" font-weight="700" fill="#10243a">dspi-config 的工作框架</text>
+<text x="44" y="85" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#52677b">一套 Bash 客户端读取本板 BSP 数据，分别管理启动配置、签名软件源和系统包。</text>
+<rect x="44" y="124" width="314" height="145" rx="14" fill="#fff5df" stroke="#e6c881" stroke-width="1.5"/>
+<text x="64" y="158" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#805b14">用户入口</text>
+<text x="64" y="190" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">中文 whiptail 菜单</text>
+<text x="64" y="217" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">命令行 / SSH 终端</text>
+<text x="64" y="244" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">sudo dspi-config</text>
+<rect x="44" y="328" width="314" height="174" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="64" y="362" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">本板 BSP profile</text>
+<text x="64" y="394" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">/etc/armbian-release</text>
+<text x="64" y="421" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">boards/&lt;board&gt;/system.conf</text>
+<text x="64" y="448" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">boards/&lt;board&gt;/overlays.tsv</text>
+<text x="64" y="475" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">DTBO 由 BSP / DTB 包交付</text>
+<rect x="424" y="174" width="350" height="310" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="444" y="208" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">bin/dspi-config</text>
+<text x="444" y="240" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">板卡识别与 profile 读取</text>
+<text x="444" y="267" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">status：只读聚合</text>
+<text x="444" y="294" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">overlay：校验并写启动配置</text>
+<text x="444" y="321" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">source：校验并切换源</text>
+<text x="444" y="348" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">update：精确包集交给 APT</text>
+<rect x="840" y="124" width="316" height="132" rx="14" fill="#e7f6f0" stroke="#98cebb" stroke-width="1.5"/>
+<text x="860" y="158" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#14654e">启动配置</text>
+<text x="860" y="190" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">armbianEnv.txt + 最近一次备份</text>
+<text x="860" y="217" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">重启后加载 Overlay</text>
+<rect x="840" y="300" width="316" height="132" rx="14" fill="#e7f6f0" stroke="#98cebb" stroke-width="1.5"/>
+<text x="860" y="334" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#14654e">签名软件源</text>
+<text x="860" y="366" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">DShanPI stable / testing</text>
+<text x="860" y="393" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">Ubuntu Ports 镜像预设</text>
+<rect x="840" y="476" width="316" height="132" rx="14" fill="#e7f6f0" stroke="#98cebb" stroke-width="1.5"/>
+<text x="860" y="510" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#14654e">APT / dpkg</text>
+<text x="860" y="542" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">模拟 → 用户确认 → 安装</text>
+<text x="860" y="569" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">处理精确依赖与软件包脚本</text>
+<polyline points="358,196 424,230" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="358,415 424,415" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="774,260 805,260 805,190 840,190" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="774,350 840,366" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="774,440 805,440 805,542 840,542" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="44" y="652" width="1112" height="110" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="64" y="686" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#233a52">四板共用逻辑，差异由 BSP 声明</text>
+<text x="64" y="718" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">DShanPI A1 / A1 CM5 / R1 / Avaota A1；仅使用 common 与本板 APT component。</text>
+</svg>

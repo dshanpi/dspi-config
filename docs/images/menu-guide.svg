@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="790" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+<title id="title">中文终端菜单操作导览</title><desc id="desc">交互示意图，按实际菜单项绘制；非实板截图，颜色与尺寸可能随终端变化。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#64748b"/></marker></defs>
+<rect width="1200" height="790" rx="20" fill="#f4f7fb"/>
+<text x="44" y="52" font-family="Noto Sans CJK SC, sans-serif" font-size="30" font-weight="700" fill="#10243a">中文终端菜单操作导览</text>
+<text x="44" y="85" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#52677b">交互示意图，按实际菜单项绘制；非实板截图，颜色与尺寸可能随终端变化。</text>
+<rect x="44" y="122" width="620" height="570" rx="16" fill="#12283c"/>
+<text x="78" y="166" font-family="Noto Sans CJK SC, sans-serif" font-size="20" font-weight="400" fill="#bde4f4">$ sudo dspi-config</text>
+<rect x="78" y="194" width="552" height="394" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="98" y="228" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#233a52">DShanPI Config · 系统配置</text>
+<text x="110" y="270" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#154a91">status</text>
+<text x="255" y="270" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#334155">查看系统状态</text>
+<rect x="94" y="292" width="520" height="42" rx="7" fill="#eaf2ff"/>
+<text x="110" y="319" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#154a91">overlays</text>
+<text x="255" y="319" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#334155">设备树 Overlay</text>
+<text x="110" y="368" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#154a91">source</text>
+<text x="255" y="368" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#334155">软件源</text>
+<text x="110" y="417" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#154a91">updates</text>
+<text x="255" y="417" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#334155">系统升级/回滚</text>
+<text x="110" y="466" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#154a91">exit</text>
+<text x="255" y="466" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#334155">退出</text>
+<text x="178" y="561" font-family="Noto Sans CJK SC, sans-serif" font-size="18" font-weight="400" fill="#154a91">&lt; 确定 &gt;                 &lt; 取消 &gt;</text>
+<text x="78" y="641" font-family="Noto Sans CJK SC, sans-serif" font-size="19" font-weight="400" fill="#d2e3ef">↑ ↓ 选择    Tab 切换按钮    Enter 确认</text>
+<rect x="722" y="135" width="434" height="118" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="742" y="169" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">查看系统状态</text>
+<text x="742" y="201" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">核对 Board / System / Kernel</text>
+<text x="742" y="228" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">升级后区分安装版本与运行内核</text>
+<rect x="722" y="278" width="434" height="118" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="742" y="312" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">设备树 Overlay</text>
+<text x="742" y="344" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">输入 token 启用；-token 禁用</text>
+<text x="742" y="371" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">先 overlay list，修改后重启</text>
+<rect x="722" y="421" width="434" height="118" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="742" y="455" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">软件源</text>
+<text x="742" y="487" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">stable / testing 改变 DShanPI 渠道</text>
+<text x="742" y="514" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">official / tuna / ustc 改变 Ubuntu 源</text>
+<rect x="722" y="564" width="434" height="128" rx="14" fill="#eaf2ff" stroke="#9ab9ee" stroke-width="1.5"/>
+<text x="742" y="598" font-family="Noto Sans CJK SC, sans-serif" font-size="21" font-weight="700" fill="#154a91">系统升级 / 回滚</text>
+<text x="742" y="630" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">填写列表中的精确系统版本</text>
+<text x="742" y="657" font-family="Noto Sans CJK SC, sans-serif" font-size="16" font-weight="400" fill="#334155">留空调用回滚；安装前查看 APT 模拟</text>
+<text x="44" y="748" font-family="Noto Sans CJK SC, sans-serif" font-size="17" font-weight="400" fill="#334155">菜单与命令行调用相同业务函数；取消输入框返回菜单，实际写入和安装需要 root 权限。</text>
+</svg>
